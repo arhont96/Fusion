@@ -33,14 +33,14 @@
 
 <h1>Обратная связь</h1>
 <div id="wrapper">
-    @using (Html.BeginForm("viewtable", "callback", new { ReturnUrl = ViewBag.ReturnUrl }, FormMethod.Post, new { @class = "contact_form", role = "form" }))
+    @using (Html.BeginForm("viewtable", "Callback", new { ReturnUrl = ViewBag.ReturnUrl }, FormMethod.Post, new { @class = "contact_form", role = "form" }))
     {
         //кнопка добавления
-        <div id="datefilter"> 
-            <a href="~/uniform/uniform?updorins=-1" class="btn btn-success">Добавить отзыв</a> 
+        <div id="datefilter">
+            <a href="~/callback/uniform?updorins=-1" class="btn btn-success">Добавить отзыв</a>
             @Html.EditorFor(m => m.DateNEW1, new { @required = true, @type = "date", @ID = "daten1", @value = Model.DateNEW1 })
             @Html.EditorFor(m => m.DateNEW2, new { @required = true, @type = "date", @ID = "daten2", @value = Model.DateNEW2 })
-            <button type="submit" class="btn btn-primary" id="">Вывести отзывы</button> 
+            <button type="submit" class="btn btn-primary" id="">Вывести отзывы</button>
         </div>
 
         <div id="filters">
@@ -52,6 +52,7 @@
                 <option value="Положительный">Полож</option>
                 <option value="Отрицательный">Отриц</option>
                 <option value="Критичный">Крит</option>
+                <option value="ОТРАВЛЕНИЕ">ОТРАВ</option>
             </select>
 
             <input id="numf" placeholder="Номер телефона" />
@@ -68,11 +69,12 @@
                 <option value="Доставка">Доставка</option>
                 <option value="КЦ">КЦ</option>
                 <option value="БК">БК</option>
+                <option value="Маркетинг/сайт">Маркет.</option>
             </select>
 
             <select id="digits">
                 <option value="">---</option>
-                <option value="Гайдос">Гайдос</option>
+                <option value="Гайдамак">Гайдамак</option>
                 <option value="Киото">Киото</option>
                 <option value="Мауро">Мауро</option>
                 <option value="Хоум">Хоум</option>
@@ -109,8 +111,11 @@
                     });
                 });
             </script>
+            <input type="checkbox" id="nalid" value="0" />Наличные
+            <input type="checkbox" id="bonusid" value="0" />Бонусы
+            <input type="checkbox" id="sertid" value="0" />Сертификат
         </div>
-            
+
 
         //отзывы
         <table class="sortable table table-bordered table-hover" id="t">
@@ -133,10 +138,9 @@
                     string rowColor = "";
                     string textColor = "";
 
-                    if (@attribute.DateClose != null)
+                    if (@attribute.DateClose != null && @attribute.Rating != null)
                     {
                         textColor = "#ffffff";
-
                         switch (attribute.Rating)
                         {
                             case "Положительный":
@@ -151,15 +155,12 @@
                             case "ОТРАВЛЕНИЕ":
                                 rowColor = "#000000";
                                 break;
-                            default:
-                                textColor = "#000";
-                                break;
                         }
                     }
 
                     if (attribute.Rating == null || attribute.Rating == String.Empty)
                     {
-                        attribute.Rating = "-"; 
+                        attribute.Rating = "-";
                     }
                     if (attribute.DateClose == null || attribute.DateClose == String.Empty)
                     {
@@ -185,8 +186,14 @@
                     {
                         attribute.Source = "-";
                     }
-                        
-                    <tr id="@attribute.id" style="background:@rowColor" onclick="document.location='/callback/uniform?updorins=@attribute.id'">
+
+                    int cost;
+                    int costpoint;
+                    int costsert;
+                    cost = Convert.ToInt32(@attribute.Cost);
+                    costpoint = Convert.ToInt32(@attribute.CostPoint);
+                    costsert = Convert.ToInt32(@attribute.CostSert);
+                    <tr id="@attribute.id" style="background:@rowColor" onclick="document.location='/Callback/uniform?updorins=@attribute.id'">
                         <td>@Html.ActionLink(attribute.FIO, "uniform", new { @updorins = @attribute.id }, new { @style = "color:" + textColor })</td>
                         <td>@Html.ActionLink(attribute.Rating, "uniform", new { @updorins = @attribute.id }, new { @style = "color:" + textColor })</td>
                         <td>@Html.ActionLink(attribute.Phone, "uniform", new { @updorins = @attribute.id }, new { @style = "color:" + textColor })</td>
@@ -196,6 +203,10 @@
                         <td>@Html.ActionLink(attribute.Rest, "uniform", new { @updorins = @attribute.id }, new { @style = "color:" + textColor })</td>
                         <td>@Html.ActionLink(attribute.Type, "uniform", new { @updorins = @attribute.id }, new { @style = "color:" + textColor })</td>
                         <td>@Html.ActionLink(attribute.Source, "uniform", new { @updorins = @attribute.id }, new { @style = "color:" + textColor })</td>
+
+                        <td hidden id="costid">@cost</td>
+                        <td hidden id="costpointid">@costpoint</td>
+                        <td hidden id="costsertid">@costsert</td>
                         <td hidden id="cldate">@attribute.DateClose</td>
                     </tr>
                 }
@@ -245,7 +256,25 @@
             5: document.getElementById("unitf"),
             6: document.getElementById("digits"),
             7: document.getElementById("typef"),
-            8: document.getElementById("sourcef")
+            8: document.getElementById("sourcef"),
+            9: new filterTable.Filter([document.getElementById("nalid")],
+            function (value, filters, i) {
+                if (false === filters[i].checked) return true;
+                return filters[0].checked && filters[0].value !== value;
+            }
+            ),
+            10: new filterTable.Filter([document.getElementById("bonusid")],
+            function (value, filters, i) {
+                if (false === filters[i].checked) return true;
+                return filters[0].checked && filters[0].value !== value;
+            }
+            ),
+            11: new filterTable.Filter([document.getElementById("sertid")],
+            function (value, filters, i) {
+                if (false === filters[i].checked) return true;
+                return filters[0].checked && filters[0].value !== value;
+            }
+            )
         }
     );
 
@@ -288,13 +317,21 @@
     <span>Всего пришло отзывов: @Model.persons.Count</span>
     @{
         int sum = 0;
+        int sumb = 0;
+        int sums = 0;
     }
     @foreach (var attribute in Model.persons)
     {
         sum = sum + Convert.ToInt32(attribute.Cost);
+        sumb = sumb + Convert.ToInt32(attribute.CostPoint);
+        sums = sums + Convert.ToInt32(attribute.CostSert);
     }
     <br />
-    <span>Все расходы: @sum рублей</span>
+    <span>
+        Все расходы(наличные): @sum руб.<br />
+        Все расходы(баллы): @sumb б.<br />
+        Все расходы(сертификаты): @sums руб.<br />
+    </span>
     <br />
 
     @{

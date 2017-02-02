@@ -14,14 +14,23 @@ namespace Fusion.Controllers
         public ActionResult Index()
         {
             CRMViewModels.OverallViewModel model = new CRMViewModels.OverallViewModel();
+            model.IHA = new CRMViewModels.OverallViewModel.InvalidHoldersAccounts();
+            model.IHA.GetIHA();
             return View(model);
+        }
+        [MyAuthorize(Roles = "BonusClubManager, BonusClubAdmin, FusionAdmin")]
+        public ActionResult CreateAccounts()
+        {
+            CRMViewModels.OverallViewModel.InvalidHoldersAccounts model = new CRMViewModels.OverallViewModel.InvalidHoldersAccounts();
+            model.AddAccounts();
+            return RedirectToAction("Index");
         }
         [MyAuthorize(Roles = "BonusClubManager, BonusClubAdmin, FusionAdmin")]
         public ActionResult Transactions(long? people_id)
         {
             CRMViewModels.TransactionsViewModel model = new CRMViewModels.TransactionsViewModel();
             model.people_id = people_id;
-            model.StartDateTime = DateTime.Today.AddMonths(-1);
+            model.StartDateTime = DateTime.Today.AddDays(-7);
             model.EndDateTime = DateTime.Today.AddDays(1);
             model.Search();
             return View(model);
@@ -164,7 +173,7 @@ namespace Fusion.Controllers
             RKCRM.AddHoldersModel model = new RKCRM.AddHoldersModel();
             model.Holder = new RKCRM.Holder();
             model.Holder.Group_ID = "45";
-            model.Holder.Birth = "01.01.1990";
+            model.Holder.Birth = "01.12.1900";
             model.Holder.Contacts = new List<RKCRM.Holder.ContactInfo>();
             model.Holder.Contacts.Add(new RKCRM.Holder.ContactInfo() { Type_ID = "254", Dispatch = "True", Value = "" });
             return View(model);
@@ -195,7 +204,18 @@ namespace Fusion.Controllers
             if (model.LastResult == "")
                 return RedirectToAction("EditPerson", new { people_id = model.Holder.Holder_ID });
             else
+            {
+                if (model.Holder.Cards == null)
+                    model.Holder.Cards = new List<RKCRM.Holder.CardInfo>();
+
+                if (model.Holder.Accounts == null)
+                    model.Holder.Accounts = new List<RKCRM.Holder.AccountInfo>();
+
+                if (model.Holder.Contacts == null)
+                    model.Holder.Contacts = new List<RKCRM.Holder.ContactInfo>();
+
                 return View(model);
+            }
         }
         [MyAuthorize(Roles = "BonusClubManager, BonusClubAdmin, FusionAdmin")]
         public ActionResult AddTransaction(string CardCode, Decimal bp)

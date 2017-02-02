@@ -75,6 +75,7 @@ namespace Fusion.Models
         public class CheckInfo
         {
             private CARD_SYSTEMEntities db = new CARD_SYSTEMEntities();
+            private RK7Entities dbRK = new RK7Entities();
             public class EXTINFO
             {
                 public class INTERFACE
@@ -224,19 +225,41 @@ namespace Fusion.Models
                 this.shiftnum = c.shiftnum;
                 this.stationcode = c.stationcode;
             }
+            [XmlIgnore]
+            public CASHGROUPS midserver;
+            [XmlIgnore]
+            public CASHES cashstation;
+            [XmlIgnore]
+            public Decimal bp_plus = 0;
+            [XmlIgnore]
+            public Decimal bp_minus = 0;
+
             public bool GetCheck(Guid TransactionGuid)
             {
                 CARD_TRANSACTION_NOTES checkinfo = db.CARD_TRANSACTION_NOTES.FirstOrDefault(p => p.TRANSACT_GUID == TransactionGuid);
 
-                if (checkinfo != null)
+                if (checkinfo != null && checkinfo.DOP_INFO != null)
                 {
-                    if (checkinfo.DOP_INFO != null)
+                    CARD_TRANSACTIONS transaction = db.CARD_TRANSACTIONS.FirstOrDefault(p => p.TRANSACT_GUID == TransactionGuid && p.TRANSACTION_TYPE == 162);
+
+                    if (transaction != null && transaction.SUMM != null)
+                        bp_plus = (decimal)transaction.SUMM;
+
+                    transaction = db.CARD_TRANSACTIONS.FirstOrDefault(p => p.TRANSACT_GUID == TransactionGuid && p.TRANSACTION_TYPE == 161);
+
+                    if (transaction != null && transaction.SUMM != null)
+                        bp_minus = (decimal)transaction.SUMM;
+
+                    this.Deserialize(checkinfo.DOP_INFO);
+
+                    midserver = dbRK.CASHGROUPS.FirstOrDefault(p => p.NETNAME == cashservername && p.STATUS == 3);
+
+                    if (midserver != null)
                     {
-                        this.Deserialize(checkinfo.DOP_INFO);
-                        return true;
+                        cashstation = dbRK.CASHES.FirstOrDefault(p => p.CASHGROUP == midserver.SIFR && p.STATUS == 3 && p.CODE == stationcode);
                     }
-                    else
-                        return false;
+
+                    return true;
                 }
                 else
                     return false;
@@ -245,6 +268,92 @@ namespace Fusion.Models
         public class OverallViewModel
         {
             private CARD_SYSTEMEntities db = new CARD_SYSTEMEntities();
+
+            public class InvalidHoldersAccounts
+            {
+                private static SqlConnection GetConnection()
+                {
+                    string connectionString = WebConfigurationManager.ConnectionStrings["crmConnectionString"].ConnectionString;
+                    SqlConnection dbConnection = new SqlConnection(connectionString);
+                    dbConnection.Open();
+                    return dbConnection;
+                }
+
+                public int count { get; set; }
+                public void GetIHA()
+                {
+                    SqlConnection con = GetConnection();
+                    SqlCommand command = new SqlCommand("SELECT COUNT(t1.PEOPLE_ID) FROM (select cp.PEOPLE_ID, COUNT(cpa.PEOPLE_ACCOUNT_ID) as accountcount from CARD_PEOPLES cp INNER JOIN CARD_PEOPLE_ACCOUNTS cpa ON cp.PEOPLE_ID = cpa.PEOPLE_ID where cp.GROUP_ID = 45 and cp.DELETED = 0 and cpa.DELETED = 0 GROUP BY cp.PEOPLE_ID HAVING COUNT(cpa.PEOPLE_ACCOUNT_ID) <= 2) t1", con);
+
+                    SqlDataReader rdr = command.ExecuteReader();
+
+                    if (rdr.HasRows)
+                    {
+                        foreach (DbDataRecord record in rdr)
+                        {
+                            count = Convert.ToInt32(record[0]);
+                        }
+                    }
+
+                    rdr.Close();
+                    con.Close();
+                }
+
+                public void AddAccounts()
+                {
+                    List<long> people_ids = new List<long>();
+
+                    SqlConnection con = GetConnection();
+                    SqlCommand command = new SqlCommand("select cp.PEOPLE_ID, COUNT(cpa.PEOPLE_ACCOUNT_ID) as accountcount from CARD_PEOPLES cp INNER JOIN CARD_PEOPLE_ACCOUNTS cpa ON cp.PEOPLE_ID = cpa.PEOPLE_ID where cp.GROUP_ID = 45 and cp.DELETED = 0 and cpa.DELETED = 0 GROUP BY cp.PEOPLE_ID HAVING COUNT(cpa.PEOPLE_ACCOUNT_ID) <= 2", con);
+
+                    SqlDataReader rdr = command.ExecuteReader();
+
+                    if (rdr.HasRows)
+                    {
+                        foreach (DbDataRecord record in rdr)
+                        {
+                            people_ids.Add(Convert.ToInt64(record["PEOPLE_ID"]));
+                        }
+                    }
+
+                    rdr.Close();
+                    con.Close();
+
+                    for (int i = 0; i < people_ids.Count; i++)
+                    {
+                        string query = String.Format(@"<?xml version=""1.0"" encoding=""Windows-1251"" standalone=""yes"" ?>
+							<Message Action=""Edit holders"" Terminal_Type=""15"" Global_Type=""kN3uF2TTVtmpp1Gb25Mj"">
+								<Holder_ID>{0}</Holder_ID>
+								<Include></Include>
+								<Holder>
+									<Holder_ID>{0}</Holder_ID>
+									<Group_ID>45</Group_ID>
+									<Accounts>
+										<Account>
+											<Account_Type_ID>16</Account_Type_ID>
+											<Auto_Change_Levels>false</Auto_Change_Levels>
+											<Account_Level_ID>15</Account_Level_ID>
+										</Account>
+										<Account>
+											<Account_Type_ID>18</Account_Type_ID>
+											<Auto_Change_Levels>false</Auto_Change_Levels>
+											<Account_Level_ID>22</Account_Level_ID>
+										</Account>
+                                        <Account>
+											<Account_Type_ID>11</Account_Type_ID>
+											<Auto_Change_Levels>false</Auto_Change_Levels>
+										</Account>
+									</Accounts>
+									<Addresses>
+									</Addresses>
+								</Holder>
+							</Message>", people_ids[i]);
+                        RKCRM.Query(query);
+                    }
+                }
+            }
+
+            public InvalidHoldersAccounts IHA;
             public class OverallCardInfo
             {
                 private CARD_SYSTEMEntities db = new CARD_SYSTEMEntities();
@@ -331,16 +440,14 @@ namespace Fusion.Models
                     {
                         _people_id = value;
 
-                        searchString = string.Format(@"
-                            where 
+                        searchString = string.Format(@"where 
 	                            cpa.PEOPLE_ID = {0} 
                                 and
                                 ct.TRANSACTION_TIME >= '{1}' and ct.TRANSACTION_TIME <= '{2}'
-	                            and 
-	                            ct.TRANSACTION_LINK is null
 	                            and
 	                            ca.ACCOUNT_TYPE_ID = 16
-                        ", _people_id, _StartDateTime.ToString("yyyy-MM-dd"), _EndDateTime.ToString("yyyy-MM-dd"));
+                                and
+								ct.TRANSACTION_TYPE IN (161, 162)", _people_id, _StartDateTime.ToString("yyyy-MM-dd"), _EndDateTime.ToString("yyyy-MM-dd"));
 
                         person = db.CARD_PEOPLES.FirstOrDefault(p => p.PEOPLE_ID == (long)people_id);
                     }
@@ -359,27 +466,25 @@ namespace Fusion.Models
 
                     if (_people_id != null)
                     {
-                        searchString = string.Format(@"
-                            where 
+                        searchString = string.Format(@"where 
 	                            cpa.PEOPLE_ID = {0} 
                                 and
                                 ct.TRANSACTION_TIME >= '{1}' and ct.TRANSACTION_TIME <= '{2}'
-	                            and 
-	                            ct.TRANSACTION_LINK is null
 	                            and
 	                            ca.ACCOUNT_TYPE_ID = 16
-                        ", _people_id, _StartDateTime.ToString("yyyy-MM-dd"), _EndDateTime.ToString("yyyy-MM-dd"));
+                                and
+								ct.TRANSACTION_TYPE IN (161, 162)", _people_id, _StartDateTime.ToString("yyyy-MM-dd"), _EndDateTime.ToString("yyyy-MM-dd 23:59:59"));
                     }
                     else
                     {
-                        searchString = string.Format(@"
-                            where 
+                        searchString = string.Format(@"where 
                                 ct.TRANSACTION_TIME >= '{0}' and ct.TRANSACTION_TIME <= '{1}'
-	                            and 
-	                            ct.TRANSACTION_LINK is null
 	                            and
 	                            ca.ACCOUNT_TYPE_ID = 16
-                        ", _StartDateTime.ToString("yyyy-MM-dd"), _EndDateTime.ToString("yyyy-MM-dd"));
+                                and
+                                ct.TRANSACTION_LINK IS NULL
+                                and
+								ct.TRANSACTION_TYPE IN (161, 162)", _StartDateTime.ToString("yyyy-MM-dd"), _EndDateTime.ToString("yyyy-MM-dd 23:59:59"));
                     }
                 }
             }
@@ -396,27 +501,23 @@ namespace Fusion.Models
 
                     if (_people_id != null)
                     {
-                        searchString = string.Format(@"
-                            where 
+                        searchString = string.Format(@"where 
 	                            cpa.PEOPLE_ID = {0} 
                                 and
                                 ct.TRANSACTION_TIME >= '{1}' and ct.TRANSACTION_TIME <= '{2}'
-	                            and 
-	                            ct.TRANSACTION_LINK is null
 	                            and
 	                            ca.ACCOUNT_TYPE_ID = 16
-                        ", _people_id, _StartDateTime.ToString("yyyy-MM-dd"), _EndDateTime.ToString("yyyy-MM-dd"));
+								and
+								ct.TRANSACTION_TYPE IN (161, 162)", _people_id, _StartDateTime.ToString("yyyy-MM-dd"), _EndDateTime.ToString("yyyy-MM-dd 23:59:59"));
                     }
                     else
                     {
-                        searchString = string.Format(@"
-                            where 
+                        searchString = string.Format(@"where 
                                 ct.TRANSACTION_TIME >= '{0}' and ct.TRANSACTION_TIME <= '{1}'
-	                            and 
-	                            ct.TRANSACTION_LINK is null
 	                            and
 	                            ca.ACCOUNT_TYPE_ID = 16
-                        ", _StartDateTime.ToString("yyyy-MM-dd"), _EndDateTime.ToString("yyyy-MM-dd"));
+								and
+								ct.TRANSACTION_TYPE IN (161, 162)", _StartDateTime.ToString("yyyy-MM-dd"), _EndDateTime.ToString("yyyy-MM-dd 23:59:59"));
                     }
                 }
             }
@@ -424,33 +525,28 @@ namespace Fusion.Models
             private CARD_SYSTEMEntities db = new CARD_SYSTEMEntities();
             public class TransactionInfo
             {
-                public string Operation { get; set; }
                 public long transaction_id { get; set; }
+                public long? transaction_link { get; set; }
                 public Guid TransactionGuid { get; set; }
-                public string state { get; set; }
                 public DateTime transaction_time { get; set; }
                 public int transaction_type { get; set; }
-                public Decimal summ { get; set; }
                 public long card_code { get; set; }
                 public string account_name { get; set; }
                 public string dop_info { get; set; }
                 public string REASON { get; set; }
                 public string NOTES { get; set; }
+                public string full_name { get; set; }
+                public Decimal bpAccrued = 0;
+                public Decimal bpSpented = 0;
             }
             public List<TransactionInfo> Transactions = new List<TransactionInfo>();
             public void Search()
             {
+
                 string query = String.Format(@"select 
 	                                DISTINCT
-	                                CASE   
-                                      WHEN cat.TRANSACTION_CREDIT_ID IS NULL THEN 'Списание'   
-                                      WHEN cat.TRANSACTION_CREDIT_ID IS NOT NULL THEN 'Пополнение'
-	                                END as Operation,
+                                    ct.TRANSACTION_LINK,
 	                                ct.TRANSACTION_ID,
-	                                CASE   
-                                      WHEN ct1.TRANSACTION_ID IS NULL THEN 'Проведен'   
-                                      WHEN ct1.TRANSACTION_ID IS NOT NULL THEN 'Отменен'
-	                                END as Status,
 	                                ct.TRANSACTION_TIME,
 	                                ct.TRANSACTION_TYPE,
 									ct.TRANSACT_GUID,
@@ -463,39 +559,20 @@ namespace Fusion.Models
 									cp.FULL_NAME,
 									ctr.NAME AS REASON,
 									ctn.NOTES,
-									MAX(cc.CARD_CODE) as CARD_CODE
+									ct.CARD_CODE
                                 from CARD_TRANSACTIONS ct
 	                                INNER JOIN CARD_PEOPLE_ACCOUNTS cpa ON ct.ACCOUNT_ID = cpa.PEOPLE_ACCOUNT_ID
 	                                INNER JOIN CARD_ACCOUNT_TYPES ca ON cpa.ACCOUNT_TYPE_ID = ca.ACCOUNT_TYPE_ID
-	                                LEFT JOIN CARD_TRANSACTIONS ct1 ON ct.TRANSACTION_ID = ct1.TRANSACTION_LINK
 	                                LEFT JOIN CARD_TRANSACTION_NOTES ctn ON ct.TRANSACT_GUID = ctn.TRANSACT_GUID
-									LEFT JOIN CARD_TRANSFER_REASONS ctr ON ctn.TRANSFER_REASON_ID = ctr.TRANSFER_REASON_ID
-	                                LEFT JOIN CARD_ACCOUNT_TYPES cat ON ct.TRANSACTION_TYPE = cat.TRANSACTION_CREDIT_ID
+                                    LEFT JOIN CARD_TRANSFER_REASONS ctr ON ctn.TRANSFER_REASON_ID = ctr.TRANSFER_REASON_ID
 									LEFT JOIN CARD_PEOPLES cp ON cpa.PEOPLE_ID = cp.PEOPLE_ID
-									LEFT JOIN CARD_CARDS cc ON (cp.PEOPLE_ID = cc.PEOPLE_ID and cc.DELETED = 0 and cc.STATUS = 1)
                                 {0}
-                                GROUP BY 
-									cat.TRANSACTION_CREDIT_ID,
-									ct.TRANSACTION_ID,
-									ct1.TRANSACTION_ID,
-									ct.TRANSACTION_TIME,
-	                                ct.TRANSACTION_TYPE,
-									ct.TRANSACT_GUID,
-	                                ct.SUMM,
-	                                ct.CARD_CODE,
-	                                ca.NAME,
-	                                ctn.DOP_INFO,
-									cp.L_NAME,
-									cp.F_NAME,
-									cp.M_NAME,
-									cp.FULL_NAME,
-									ctr.NAME,
-									ctn.NOTES
-                                ORDER BY ct.TRANSACTION_TIME DESC", searchString);
+                                ORDER BY ct.TRANSACTION_LINK, ct.TRANSACTION_TIME DESC", searchString);
                 string connectionstring = WebConfigurationManager.ConnectionStrings["crmConnectionString"].ToString();
                 SqlConnection con = new SqlConnection(connectionstring);
                 con.Open();
                 SqlCommand cmd = new SqlCommand(query, con);
+                cmd.CommandTimeout = 120000;
                 SqlDataReader rdr = cmd.ExecuteReader();
 
                 foreach (DbDataRecord record in rdr)
@@ -506,17 +583,14 @@ namespace Fusion.Models
                     if (record["CARD_CODE"] != DBNull.Value)
                         ti.card_code = Convert.ToInt64(record["CARD_CODE"]);
 
+                    if (record["TRANSACTION_LINK"] != DBNull.Value)
+                        ti.transaction_link = Convert.ToInt64(record["TRANSACTION_LINK"]);
+
                     if (record["DOP_INFO"] != DBNull.Value)
                         ti.dop_info = record["DOP_INFO"].ToString();
 
-                    if (record["Operation"] != DBNull.Value)
-                        ti.Operation = record["Operation"].ToString();
-
-                    if (record["Status"] != DBNull.Value)
-                        ti.state = record["Status"].ToString();
-
-                    if (record["SUMM"] != DBNull.Value)
-                        ti.summ = Convert.ToDecimal(record["SUMM"]);
+                    if (record["FULL_NAME"] != DBNull.Value)
+                        ti.full_name = record["FULL_NAME"].ToString();
 
                     if (record["TRANSACTION_ID"] != DBNull.Value)
                         ti.transaction_id = Convert.ToInt64(record["TRANSACTION_ID"]);
@@ -527,6 +601,15 @@ namespace Fusion.Models
                     if (record["TRANSACTION_TYPE"] != DBNull.Value)
                         ti.transaction_type = Convert.ToInt32(record["TRANSACTION_TYPE"]);
 
+                    if (record["SUMM"] != DBNull.Value)
+                    {
+                        if(ti.transaction_type == 161)
+                            ti.bpSpented = Convert.ToDecimal(record["SUMM"]);
+                        else
+                            if(ti.transaction_type == 162)
+                                ti.bpAccrued = Convert.ToDecimal(record["SUMM"]);
+                    }
+
                     ti.TransactionGuid = Guid.Parse(record["TRANSACT_GUID"].ToString());
 
                     if (record["REASON"] != DBNull.Value)
@@ -535,7 +618,34 @@ namespace Fusion.Models
                     if (record["NOTES"] != DBNull.Value)
                         ti.NOTES = record["NOTES"].ToString();
 
-                    Transactions.Add(ti);
+                    if (ti.transaction_link == null)
+                    {
+                        TransactionInfo tiSearch = Transactions.FirstOrDefault(p => p.TransactionGuid == ti.TransactionGuid);
+
+                        if (tiSearch == null)
+                            Transactions.Add(ti);
+                        else
+                            if (ti.transaction_type == 161)
+                                tiSearch.bpSpented = ti.bpSpented;
+                            else
+                                if (ti.transaction_type == 162)
+                                    tiSearch.bpAccrued = ti.bpAccrued;
+                    }
+                    else
+                    {
+                        TransactionInfo tiSearch = Transactions.FirstOrDefault(p => p.transaction_id == ti.transaction_link);
+
+                        if (tiSearch == null)
+                        {
+                            Transactions.Add(ti);
+                            ti.NOTES = "Отмена транзакции " + ti.transaction_link.ToString();
+                        }
+                        else
+                        {
+                            tiSearch.transaction_link = ti.transaction_link;
+                            tiSearch.NOTES += "\r\n" + "Отмена транзакции " + ti.transaction_link.ToString();
+                        }
+                    }
                 }
 
                 con.Close();
@@ -572,7 +682,7 @@ namespace Fusion.Models
                 return dbConnection;
             }
 
-            private string searchString = "WHERE cp.GROUP_ID = 45";
+            private string searchString = "WHERE cp.DELETED = 0";
             private string orderString = " ORDER BY FULL_NAME ASC";
             private string _order = "";
             public string order
@@ -720,7 +830,11 @@ namespace Fusion.Models
                 }
                 set
                 {
-                    searchString += string.Format(" AND cpa.BALANCE >= {0}", value);
+                    if (value > 0)
+                    {
+                        searchString += string.Format(" AND cpa.BALANCE >= {0}", value);
+                    }
+
                     _BALANCE = value;
                 }
             }

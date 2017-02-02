@@ -3,7 +3,6 @@
 	height: auto;
 	margin-left:auto;
 	margin-right: auto;
-	margin-top:80px;
     background-color: #c5c5c5;
     padding:5px;
     border-radius: 50px;
@@ -37,7 +36,7 @@
     width:220px;
     padding:5px 8px;
     margin-left: 40px;
-    margin-right: 40px;
+    margin-right: 5px;
     border-radius: 20px 0;
 }
 .contact_form select {
@@ -108,3 +107,8 @@ button.submit:active {
     -ms-box-shadow: 0 0 10px 5px #356b0b inset;
     -o-box-shadow: 0 0 10px 5px #356b0b inset;
 }
+
+.field-validation-error {
+    color: red;
+}
+

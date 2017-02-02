@@ -28,11 +28,6 @@ namespace Fusion.Models.Callback
         public string UserName { get; set; }
 
         //№ телефона гостя
-        //[Required]
-        //[DataType(DataType.PhoneNumber)]
-        //public string phnumber2 { get; set; }
-
-        //№ телефона гостя
         [Required(ErrorMessage = "Введите № телефона")]
         [RegularExpression(@"89[0-9]{2}[0-9]{3}[0-9]{2}[0-9]{2}", ErrorMessage = "Введите № телефона в виде 89001110011")]
         [StringLength(11, MinimumLength = 5, ErrorMessage = "Номер должен содержать 11 цифр")]
@@ -45,11 +40,6 @@ namespace Fusion.Models.Callback
         [StringLength(300, MinimumLength = 5, ErrorMessage = "Пожалуйста напишите ваш отзыв")]
         [DataType(DataType.MultilineText)]
         public string textkomm { get; set; }
-
-        //дата
-        //[Required]
-        //[Display(Name = "MyDate")]
-        //public string MyDate { get; set; }
 
         //дата
         [Required(ErrorMessage = "Введите дату визита")]
@@ -143,11 +133,6 @@ namespace Fusion.Models.Callback
         public string UserName { get; set; }
 
         //№ телефона гостя
-        //[Required]
-        //[Display(Name = "phnumber")]
-        //public string phnumber { get; set; }
-
-        //№ телефона гостя
         [Required(ErrorMessage = "Введите № телефона")]
         [RegularExpression(@"89[0-9]{2}[0-9]{3}[0-9]{2}[0-9]{2}", ErrorMessage = "Введите № телефона в виде 89001110011")]
         [StringLength(11, MinimumLength = 5, ErrorMessage = "Номер должен содержать 11 цифр")]
@@ -156,7 +141,7 @@ namespace Fusion.Models.Callback
 
         //сам отзыв
         [Required(ErrorMessage = "Напишите отзыв")]
-        [StringLength(300, MinimumLength = 5, ErrorMessage = "Слишком короткий отзыв")]
+        [StringLength(18000,MinimumLength = 5, ErrorMessage = "Слишком короткий отзыв")]
         [DataType(DataType.MultilineText)]
         public string textkomm { get; set; }
 
@@ -282,6 +267,8 @@ namespace Fusion.Models.Callback
 
             public string DateClose { get; set; }
             public string Cost { get; set; }
+            public string CostPoint { get; set; }
+            public string CostSert { get; set; }
             public string Type { get; set; }
 
             public string Source { get; set; }
@@ -299,7 +286,7 @@ namespace Fusion.Models.Callback
 
             private static MySqlConnection GetConnect()
             {
-                string connPRTS = @"server=192.168.0.102;user Id=feedback;database=feedback;port=3306;password=73915;";
+                string connPRTS = @"server=192.168.0.102;User Id=feedback;database=feedback;port=3306;password=73915;";
                 MySqlConnection conn = new MySqlConnection(connPRTS);
                 conn.Open();
                 return conn;
@@ -309,30 +296,38 @@ namespace Fusion.Models.Callback
 
             public void Search() /*++++++++++++++++++++++++++++++++++++++++++++++++++*/
             {
-
+                
                 string time = " 23:59:59";
                 MySqlConnection con = GetConnect();
                 MySqlCommand command;
                 if (DateNEW1 == null && DateNEW2 == null)
-                {
+                {                    
                     DateTime now = DateTime.Now;
                     //DateTime.TryParseExact(now, "YY-mm-dd", null,DateTimeStyles.NoCurrentDateDefault, now);
                     DateTime yesterday = DateTime.Now.Subtract(new TimeSpan(10, 0, 0, 0));
                     DateNEW1 = Convert.ToString(yesterday);
-                    DateNEW1 = (DateNEW1.Substring(6, 4)) + "-" + (DateNEW1.Substring(3, 2)) + "-" + (DateNEW1.Substring(0, 2));
+                    DateNEW1 = (DateNEW1.Substring(6, 4))+"-" + (DateNEW1.Substring(3, 2))+ "-" + (DateNEW1.Substring(0, 2));
                     DateNEW2 = Convert.ToString(now);
-                    string DateNEW2tosql = (DateNEW2.Substring(6, 4)) + "-" + (DateNEW2.Substring(3, 2)) + "-" + (DateNEW2.Substring(0, 2)) + " " + (DateNEW2.Substring(11, 8));
+                    string DateNEW2tosql;
+                    if(DateNEW2.Count()>=19)
+                    {
+                        DateNEW2tosql = (DateNEW2.Substring(6, 4)) + "-" + (DateNEW2.Substring(3, 2)) + "-" + (DateNEW2.Substring(0, 2)) + " " + (DateNEW2.Substring(11, 8));
+                    }
+                    else
+                    {
+                        DateNEW2tosql = (DateNEW2.Substring(6, 4)) + "-" + (DateNEW2.Substring(3, 2)) + "-" + (DateNEW2.Substring(0, 2)) + " 0" + (DateNEW2.Substring(11, 7));
+                    }
                     DateNEW2 = (DateNEW2.Substring(6, 4)) + "-" + (DateNEW2.Substring(3, 2)) + "-" + (DateNEW2.Substring(0, 2));
-                    command = new MySqlCommand(@"SELECT id, FIO, Data, Phone, Unit, Rest, DateClose, Rating, Cost, Type, Source FROM tblfeedback WHERE Data BETWEEN '" + DateNEW1 + "' AND '" + DateNEW2tosql + "'", con);
+                    command = new MySqlCommand(@"SELECT id, FIO, Data, Phone, Unit, Rest, DateClose, Rating, Cost, CostPoint, CostSert, Type, Source FROM tblfeedback WHERE Data BETWEEN '" + DateNEW1 + "' AND '" + DateNEW2tosql + "'", con);
                 }
                 else
                 {
-                    command = new MySqlCommand(@"SELECT id, FIO, Data, Phone, Unit, Rest, DateClose, Rating, Cost, Type, Source FROM tblfeedback WHERE Data BETWEEN '" + DateNEW1 + "' AND '" + DateNEW2 + time + "'", con);
+                    command = new MySqlCommand(@"SELECT id, FIO, Data, Phone, Unit, Rest, DateClose, Rating, Cost, CostPoint, CostSert, Type, Source FROM tblfeedback WHERE Data BETWEEN '" + DateNEW1 + "' AND '" + DateNEW2 + time + "'", con);
                 }
                 //command.Parameters.AddWithValue("id", );
 
                 MySqlDataReader rdr = command.ExecuteReader();
-
+                
                 if (rdr.HasRows)
                 {
                     foreach (DbDataRecord record in rdr)
@@ -346,14 +341,13 @@ namespace Fusion.Models.Callback
                         if (record["Data"] != null)
                         {
                             string Date = Convert.ToString(record["Data"]);
-                            string year = Date.Substring(0, 4);
-                            string month = Date.Substring(5, 2);
-                            string day = Date.Substring(8, 2);
+                            string year = Date.Substring(0,4);
+                            string month = Date.Substring(5,2);
+                            string day = Date.Substring(8,2);
                             Date = day + "." + month + "." + year;
-                            //p.Data = Convert.ToDateTime(record["Data"]);
                             p.Data = Date;
                         }
-
+                           
                         if (record["Phone"] != null)
                             p.Phone = Convert.ToString(record["Phone"]);
                         if (record["Unit"] != null)
@@ -376,14 +370,19 @@ namespace Fusion.Models.Callback
 
                         if (Convert.ToString(record["Cost"]) != "")
                             p.Cost = Convert.ToString(record["Cost"]);
+                        if (Convert.ToString(record["CostPoint"]) != "")
+                            p.CostPoint = Convert.ToString(record["CostPoint"]);
+                        if (Convert.ToString(record["CostSert"]) != "")
+                            p.CostSert = Convert.ToString(record["CostSert"]);
+
                         if (Convert.ToString(record["Type"]) != "")
                             p.Type = Convert.ToString(record["Type"]);
 
                         if (Convert.ToString(record["Source"]) != "")
                             p.Source = Convert.ToString(record["Source"]);
-
+                            
                         persons.Add(p);
-
+               
                     }
                     persons.Reverse();
                 }
@@ -430,52 +429,17 @@ namespace Fusion.Models.Callback
 
         //выпадаюий список для подразделений
         public string Unit { get; set; }
-        //private List<SelectListItem> _unit = new List<SelectListItem>();
-        //[Required(ErrorMessage = "Пожалуйста выберите категорию")]
-        //public string SelectedUnit { get; set; }
-
-        //public List<SelectListItem> Unit
-        //{
-        //    get
-        //    {
-        //        _unit.Add(new SelectListItem() { Text = "Подразделение", Value = "Подразделение" });
-        //        _unit.Add(new SelectListItem() { Text = "Ресторан", Value = "Ресторан" });
-        //        _unit.Add(new SelectListItem() { Text = "Вынос", Value = "Вынос" });
-        //        _unit.Add(new SelectListItem() { Text = "Доставка", Value = "Доставка" });
-        //        _unit.Add(new SelectListItem() { Text = "КЦ", Value = "КЦ" });
-        //        _unit.Add(new SelectListItem() { Text = "БК", Value = "БК" });
-        //        return _unit;
-        //    }
-        //}
+       
 
         //детали проблемы
         [Required(ErrorMessage = "Введите детали проблемы")]
-        [StringLength(50, MinimumLength = 0, ErrorMessage = "Введите детали проблемы")]
+        [StringLength(254, MinimumLength = 0, ErrorMessage = "Введите детали проблемы")]
         [Display(Name = "Problem")]
         public string Problem { get; set; }
 
         //выпадаюий список для ресторанов
         public string Rest { get; set; }
-        //private List<SelectListItem> _rest = new List<SelectListItem>();
-        //[Required(ErrorMessage = "Пожалуйста выберите ресторан")]
-        //public string SelectedRest { get; set; }
-
-        //public List<SelectListItem> Rest
-        //{
-        //    get
-        //    {
-        //        _rest.Add(new SelectListItem() { Text = "Ресторан", Value = "Ресторан" });
-        //        _rest.Add(new SelectListItem() { Text = "Светланская 183 В", Value = "Светланская 183 В" });
-        //        _rest.Add(new SelectListItem() { Text = "Пр-т Острякова, 8", Value = "Пр-т Острякова, 8" });
-        //        _rest.Add(new SelectListItem() { Text = "Светланская, 121", Value = "Светланская, 121" });
-        //        _rest.Add(new SelectListItem() { Text = "Пр-т 100 лет Владивостоку, 50А", Value = "Пр-т 100 лет Владивостоку, 50А" });
-        //        _rest.Add(new SelectListItem() { Text = "Семеновская, 7В", Value = "Семеновская, 7В" });
-        //        _rest.Add(new SelectListItem() { Text = "Уссурийск", Value = "Уссурийск" });
-        //        _rest.Add(new SelectListItem() { Text = "Находка", Value = "Находка" });
-        //        return _rest;
-        //    }
-        //}
-
+        
         //фио сотрудника
         //[Required(ErrorMessage = "Пожалуйста введите ФИО")]
         //[RegularExpression(@"([а-яА-Я]+\s[а-яА-Я]+\s[а-яА-Я]+)|([а-яА-Я]+\s[а-яА-Я]+)|([а-яА-Я]+)|([а-яА-Я]+-*[а-яА-Я]+)", ErrorMessage = "Введите ФИО ответственного")]
@@ -485,25 +449,7 @@ namespace Fusion.Models.Callback
 
         //выпадаюий список для источника отзывов
         public string Source { get; set; }
-        //private List<SelectListItem> _source = new List<SelectListItem>();
-        //[Required(ErrorMessage = "Пожалуйста выберите источник")]
-        //public string SelectedSource { get; set; }
-
-        //public List<SelectListItem> Source
-        //{
-        //    get
-        //    {
-        //        _rating2.Add(new SelectListItem() { Text = "Источник отзыва", Value = "Источник отзыва" });
-        //        _rating2.Add(new SelectListItem() { Text = "Сайт", Value = "Сайт" });
-        //        _rating2.Add(new SelectListItem() { Text = "Инста", Value = "Инста" });
-        //        _rating2.Add(new SelectListItem() { Text = "Соцсети", Value = "Соцсети" });
-        //        _rating2.Add(new SelectListItem() { Text = "Телефон с чека", Value = "Телефон с чека" });
-        //        _rating2.Add(new SelectListItem() { Text = "Лично/книга жалоб", Value = "Лично/книга жалоб" });
-        //        _rating2.Add(new SelectListItem() { Text = "КЦ", Value = "КЦ" });
-        //        _rating2.Add(new SelectListItem() { Text = "БК", Value = "БК" });
-        //        return _rating2;
-        //    }
-        //}
+      
 
         //дата создания отзыва
         [Required(ErrorMessage = "Введите дату визита гостя")]
@@ -514,48 +460,21 @@ namespace Fusion.Models.Callback
         [DataType(DataType.Time)]
         public string NewTime { get; set; }
 
-        //[Required(ErrorMessage = "Введите дату визита")]
-        //[DataType(DataType.Date)]
-        //public string MyDate { get; set; }
-
-        //дата закрытия отзыва
-        //[Required(ErrorMessage = "Введите дату визита гостя")]
+      
         [DataType(DataType.Date)]
-        //[DisplayFormat(DataFormatString = "{0:dd'.'MM'.'yyyy}", ApplyFormatInEditMode = true)]
-        //[DisplayFormat(ApplyFormatInEditMode = true, DataFormatString = "{0:dd.MM.yyyy}")]
+        
         public string OldDate { get; set; }
 
         //выбор оценки отзыва
-        //[Required]
-        //[Display(Name = "Rating")]
+     
         public string Rating1 { get; set; }
-
-        //выбор оценки отзыва 2
-        //public string Method {get; set; }
-        //public string[] GetMethods(){return new [] {"Value1","Value2" };}
 
         //выпадаюий список для подробной оценки
         public string Rating2 { get; set; }
-        //private List<SelectListItem> _rating2 = new List<SelectListItem>();
-        //[Required(ErrorMessage = "Пожалуйста выберите источник")]
-        //public string SelectedRating2 { get; set; }
-
-        //public List<SelectListItem> Rating2
-        //{
-        //    get
-        //    {
-        //        _rating2.Add(new SelectListItem() { Text = "Выберите оценку", Value = "Выберите оценку"});
-        //        _rating2.Add(new SelectListItem() { Text = "Отлично", Value = "Отлично" });
-        //        _rating2.Add(new SelectListItem() { Text = "Хорошо", Value = "Хорошо" });
-        //        _rating2.Add(new SelectListItem() { Text = "Средне", Value = "Средне" });
-        //        _rating2.Add(new SelectListItem() { Text = "Плохо", Value = "Плохо" });
-        //        return _rating2;
-        //    }
-        //}
 
         //сам отзыв
         [Required(ErrorMessage = "Текст отзыва")]
-        [StringLength(2048, MinimumLength = 5, ErrorMessage = "Слишком короткий отзыв")]
+        [StringLength(18000,MinimumLength = 5, ErrorMessage = "Слишком короткий отзыв")]
         [DataType(DataType.MultilineText)]
         public string textkomm { get; set; }
 
@@ -577,15 +496,15 @@ namespace Fusion.Models.Callback
         [StringLength(15, MinimumLength = 1, ErrorMessage = "Введите цену решения проблемы")]
         [Display(Name = "Cost")]
         public string Cost { get; set; }
+        public string CostPoint { get; set; }
+        public string CostSert { get; set; }
 
         public string Type { get; set; }
 
         public string Payer { get; set; }
 
-        [StringLength(50, MinimumLength = 3, ErrorMessage = "Пожалуйста введите ФИО ответственного")]
+        [StringLength(50, MinimumLength = 0, ErrorMessage = "Слишком длинные ФИО")]
         [Display(Name = "Guilty")]
         public string Guilty { get; set; }
-
-
     }
 }
